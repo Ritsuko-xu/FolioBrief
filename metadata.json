@@ -1,0 +1,6 @@
+{
+  "name": "FolioBrief",
+  "description": "Personal AI reading and synthesis studio for PDFs and web articles with executive briefs, concise highlights, side-chat revisions, and long-term reading memory.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

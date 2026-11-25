@@ -1,0 +1,96 @@
+{
+  "name": "foliobrief",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Local-first macOS & web AI reading studio for PDFs and web articles",
+  "author": "FolioBrief",
+  "type": "module",
+  "main": "dist-electron/main.cjs",
+  "scripts": {
+    "dev": "tsx server.ts",
+    "start": "node server.ts",
+    "build": "vite build",
+    "preview": "vite preview",
+    "electron:compile": "esbuild electron/main.ts --bundle --platform=node --format=cjs --packages=external --outfile=dist-electron/main.cjs && esbuild electron/preload.ts --bundle --platform=node --format=cjs --packages=external --outfile=dist-electron/preload.cjs",
+    "electron:rebuild": "electron-builder install-app-deps",
+    "desktop": "npm run build && npm run electron:compile && electron .",
+    "package:mac": "npm run build && npm run electron:compile && electron-builder --mac",
+    "test": "vitest run",
+    "eval": "promptfoo eval -c evals/promptfooconfig.yaml",
+    "eval:agent": "promptfoo eval -c evals/sidechat.promptfooconfig.yaml",
+    "eval:distill": "promptfoo eval -c evals/distillation.promptfooconfig.yaml",
+    "eval:view": "promptfoo view",
+    "clean": "rm -rf dist dist-electron release server.js",
+    "lint": "tsc --noEmit"
+  },
+  "build": {
+    "appId": "com.foliobrief.desktop",
+    "productName": "FolioBrief",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ]
+    }
+  },
+  "dependencies": {
+    "@google/genai": "^3.6.1",
+    "@mozilla/readability": "^0.6.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/jsdom": "^30.0.0",
+    "@types/multer": "^2.3.0",
+    "@types/supertest": "^7.2.1",
+    "@vitejs/plugin-react": "^6.1.1",
+    "better-sqlite3": "^13.2.0",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "jsdom": "^31.0.1",
+    "lucide-react": "^0.546.0",
+    "motion": "^12.23.24",
+    "multer": "^2.5.0",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.5.438",
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1",
+    "react-markdown": "^10.1.0",
+    "supertest": "^7.3.2",
+    "vite": "^8.3.0",
+    "vitest": "^5.1.1"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "autoprefixer": "^10.4.21",
+    "electron": "^45.5.0",
+    "electron-builder": "^26.18.0",
+    "esbuild": "^0.28.0",
+    "promptfoo": "^0.126.0",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.21.0",
+    "typescript": "^7.0.2"
+  }
+}

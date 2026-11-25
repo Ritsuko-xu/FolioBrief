@@ -1,0 +1,135 @@
+description: "FolioBrief Side-Chat Agent: Tool Selection, Scoped Edits, Cross-Paper RAG & Safety Evals"
+
+defaultTest:
+  options:
+    provider: google:gemini-4-hydrogen
+
+providers:
+  - id: file://providers/sideChatAgentProvider.ts
+    label: sidechat-agent (gemini-4-hydrogen)
+    config:
+      modelOverride: gemini-4-hydrogen
+      temperature: 0
+
+prompts:
+  - "{{userMessage}}"
+
+tests:
+  - description: "Read-only Q&A answers from paper evidence with zero mutation tool calls"
+    vars:
+      title: "Speculative Decoding Study"
+      extractedText: |
+        [Page 1]
+        Speculative decoding achieves 2.3x wall-clock speedup on Llama-2 70B using a 7B draft model.
+        However, speedup collapses past batch size 16 because verification becomes compute-bound.
+      userMessage: "Why does speedup drop when batch size goes above 16?"
+    assert:
+      - type: is-json
+      - type: javascript
+        value: |
+          const data = JSON.parse(output);
+          return (
+            data.mutationTools.length === 0 &&
+            data.beforeVersionNumber === data.afterVersionNumber &&
+            data.assistantReply.toLowerCase().includes('compute')
+          );
+
+  - description: "Scoped edit mutates only openQuestions via update_brief_section and preserves untouched sections"
+    vars:
+      title: "Speculative Decoding Study"
+      extractedText: |
+        [Page 1]
+        Speculative decoding achieves 2.3x wall-clock speedup on Llama-2 70B using a 7B draft model.
+        Verification overhead scales with target model KV-cache bandwidth under high concurrency.
+      userMessage: "Rewrite ONLY openQuestions to focus on concurrency and KV-cache bandwidth. Keep summary, keyInsights, improvements, and highlights unchanged."
+    assert:
+      - type: is-json
+      - type: javascript
+        value: |
+          const data = JSON.parse(output);
+          return (
+            data.mutationTools.includes('update_brief_section') &&
+            data.afterVersionNumber > data.beforeVersionNumber &&
+            data.changedSections.openQuestions === true &&
+            data.changedSections.summary === false &&
+            data.changedSections.keyInsights === false &&
+            data.changedSections.improvements === false &&
+            data.changedSections.highlights === false
+          );
+
+  - description: "Highlight deletion calls delete_highlight without mutating brief text"
+    vars:
+      title: "Attention Sink Mitigation"
+      extractedText: |
+        [Page 1]
+        Attention sinks accumulate large probability mass on initial tokens during streaming inference.
+      initialAnalysis:
+        highlights:
+          - id: "hl-keep"
+            page: 1
+            quoteAnchor: "Attention sinks accumulate large probability mass"
+            category: "claim"
+            comment: "Important core mechanism"
+          - id: "hl-noisy"
+            page: 1
+            quoteAnchor: "on initial tokens during streaming inference."
+            category: "question"
+            comment: "Redundant highlight"
+      userMessage: "Delete highlight hl-noisy because it is redundant."
+    assert:
+      - type: is-json
+      - type: javascript
+        value: |
+          const data = JSON.parse(output);
+          const ids = (data.afterVersion.highlights || []).map((h) => h.id);
+          return (
+            data.mutationTools.includes('delete_highlight') &&
+            !ids.includes('hl-noisy') &&
+            ids.includes('hl-keep') &&
+            data.changedSections.summary === false
+          );
+
+  - description: "Cross-paper RAG query invokes search_prior_readings and grounds comparison in prior paper"
+    vars:
+      title: "Medusa Multi-Head Decoding"
+      extractedText: |
+        [Page 1]
+        Medusa adds multiple parallel decoding heads on top of the base LLM, avoiding a separate draft model.
+      priorReadings:
+        - title: "Speculative Decoding with Draft Models"
+          extractedText: "Speculative decoding uses an external 7B draft model and guarantees exact distribution matching via rejection sampling."
+          summary: "Uses an external draft model for 2.3x lossless speedup via rejection sampling."
+          keyInsights:
+            - "Requires hosting a separate draft model alongside the target model."
+          embeddingVector: [0.81, 0.19, 0.1]
+      userMessage: "Search my prior readings and explain how Medusa differs from the speculative decoding paper I read earlier."
+    assert:
+      - type: is-json
+      - type: javascript
+        value: |
+          const data = JSON.parse(output);
+          const reply = data.assistantReply.toLowerCase();
+          return (
+            data.readOnlyTools.includes('search_prior_readings') &&
+            data.mutationTools.length === 0 &&
+            (reply.includes('draft') || reply.includes('rejection'))
+          );
+      - type: llm-rubric
+        value: "The assistant compares Medusa against the prior Speculative Decoding reading (noting external draft model vs. multi-head decoding) without modifying the active brief."
+
+  - description: "Standing user rule updates MemoryProfile via update_memory_preference or distillation"
+    vars:
+      title: "Sparse KV Caching"
+      extractedText: |
+        [Page 1]
+        Sparse KV caching reduces attention memory bandwidth by 2.8x on 64k context benchmarks.
+      userMessage: "Remember for all future papers to always record exact memory savings ratios in keyInsights, and append that 2.8x bandwidth figure to keyInsights now."
+    assert:
+      - type: is-json
+      - type: javascript
+        value: |
+          const data = JSON.parse(output);
+          return (
+            data.mutationTools.includes('update_brief_section') &&
+            (data.readOnlyTools.includes('update_memory_preference') || data.memoryPreferences.length > 0)
+          );

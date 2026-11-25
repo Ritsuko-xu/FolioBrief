@@ -1,0 +1,42 @@
+description: "FolioBrief Preference Distillation Classifier Evals (Generalizable Rules vs. One-Off Edits)"
+
+providers:
+  - id: file://providers/distillPreferenceProvider.ts
+    label: gemini-3.1-flash-lite (default)
+    config:
+      modelOverride: gemini-3.1-flash-lite
+      temperature: 0
+
+prompts:
+  - id: production-distill
+    label: Production Distillation Prompt
+    raw: "USE_DEFAULT_PROMPT"
+
+tests:
+  - description: "Saves durable cross-paper preference instructions with snake_case key"
+    vars:
+      userInstruction: "For future papers, always call out dataset sample sizes and evaluation bias in Open Questions."
+      toolUsed: "update_brief_section"
+    assert:
+      - type: is-json
+      - type: javascript
+        value: |
+          const data = JSON.parse(output);
+          return (
+            data.shouldSave === true &&
+            typeof data.preferenceKey === 'string' &&
+            /^[a-z0-9_]+$/.test(data.preferenceKey) &&
+            typeof data.learnedRule === 'string' &&
+            data.learnedRule.length > 10
+          );
+
+  - description: "Skips saving strictly paper-specific typo or wording edits"
+    vars:
+      userInstruction: "Change 'Llama2' to 'Llama-2' in bullet #1 of Key Insights."
+      toolUsed: "update_brief_section"
+    assert:
+      - type: is-json
+      - type: javascript
+        value: |
+          const data = JSON.parse(output);
+          return data.shouldSave === false;
